@@ -13,19 +13,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let real_args: Vec<String> = argv
         .iter()
-        .filter(|i| !i.starts_with("-"))
+        .filter(|i| !i.starts_with('-'))
         .map(|i| i.to_string())
         .collect();
 
     let sub_args: String = argv
         .iter()
-        .filter(|i| i.starts_with("-"))
+        .filter(|i| i.starts_with('-'))
         .map(|i| i[1..].to_string())
         .collect::<Vec<String>>()
         .join("");
 
-    let do_compression = sub_args.contains("c");
-    let mode = match sub_args.contains("d") {
+    let do_compression = sub_args.contains('c');
+    let mode = match sub_args.contains('d') {
         true => Mode::Decode,
         false => Mode::Encode,
     };
@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             if do_compression {
                 let mut compressor = LzmaWriter::new_compressor(&mut file_data, 7)?;
-                let mut buf = [0 as u8; 1024];
+                let mut buf = [0u8; 1024];
                 loop {
                     match file.read(&mut buf) {
                         Err(e) => panic!("Error: {}", e),
@@ -73,16 +73,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             let image_xy_size = ((file_data.len() + 8) as f64 / 4.0).sqrt().ceil() as u32;
             let mut image = RgbaImage::new(image_xy_size, image_xy_size);
             let mut file_data_reader = BufReader::new(file_data.as_slice());
-            let mut buf = [0 as u8; 4];
+            let mut buf = [0u8; 4];
             let file_size_be_bytes = file_data.len().to_be_bytes();
             let mut file_size_be_bytes_reader = BufReader::new(file_size_be_bytes.as_slice());
-            file_size_be_bytes_reader.read(&mut buf)?;
+            file_size_be_bytes_reader.read_exact(&mut buf)?;
             image.put_pixel(0, 0, Rgba(buf));
-            file_size_be_bytes_reader.read(&mut buf)?;
+            file_size_be_bytes_reader.read_exact(&mut buf)?;
             image.put_pixel(0, 1, Rgba(buf));
 
-            for x in 0..image_xy_size as u32 {
-                for y in 0..image_xy_size as u32 {
+            for x in 0..image_xy_size {
+                for y in 0..image_xy_size {
                     if (y == 0 || y == 1) && x == 0 {
                         continue;
                     }
@@ -98,15 +98,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut image_data: Vec<u8> = Vec::new();
 
             let file_size = {
-                let mut r = [0 as u8; 8];
+                let mut r = [0u8; 8];
                 let p1 = image.get_pixel(0, 0).0;
                 let p2 = image.get_pixel(0, 1).0;
-                for i in 0..4 as usize {
-                    r[i] = p1[i]
-                }
-                for i in 4..8 as usize {
-                    r[i] = p2[i - 4]
-                }
+                r[..4usize].copy_from_slice(&p1);
+                r[4..].copy_from_slice(&p2);
 
                 u64::from_be_bytes(r)
             };
@@ -124,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             let mut output_file = File::create(output_path)?;
             let mut take = image_data.take(file_size);
-            let mut buf = [0 as u8; 1024];
+            let mut buf = [0u8; 1024];
 
             if do_compression {
                 let mut decompressor = LzmaWriter::new_decompressor(output_file)?;
@@ -135,7 +131,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             if size == 0 {
                                 break;
                             }
-                            decompressor.write_all(&mut buf[..size])?;
+                            decompressor.write_all(&buf[..size])?;
                         }
                     }
                 }
@@ -148,7 +144,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             if size == 0 {
                                 break;
                             }
-                            output_file.write_all(&mut buf[..size])?;
+                            output_file.write_all(&buf[..size])?;
                         }
                     }
                 }
